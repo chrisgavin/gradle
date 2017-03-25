@@ -67,6 +67,9 @@ public class BeanDynamicObject extends AbstractDynamicObject {
     private final MethodArgumentsTransformer argsTransformer;
     private final PropertySetTransformer propertySetTransformer;
 
+    private BeanDynamicObject withNoProperties;
+    private BeanDynamicObject withNoImplementsMissing;
+
     static {
         try {
             META_PROP_METHOD = MetaClassImpl.class.getDeclaredMethod("getMetaProperty", String.class, boolean.class);
@@ -115,11 +118,27 @@ public class BeanDynamicObject extends AbstractDynamicObject {
     }
 
     public BeanDynamicObject withNoProperties() {
-        return new BeanDynamicObject(bean, publicType, false, implementsMissing, propertySetTransformer, argsTransformer);
+        if (withNoProperties == null) {
+            withNoProperties = new BeanDynamicObject(bean, publicType, false, implementsMissing, propertySetTransformer, argsTransformer) {
+                @Override
+                public BeanDynamicObject withNoProperties() {
+                    return this;
+                }
+            };
+        }
+        return withNoProperties;
     }
 
     public BeanDynamicObject withNotImplementsMissing() {
-        return new BeanDynamicObject(bean, publicType, includeProperties, false, propertySetTransformer, argsTransformer);
+        if (withNoImplementsMissing == null) {
+            withNoImplementsMissing = new BeanDynamicObject(bean, publicType, includeProperties, false, propertySetTransformer, argsTransformer) {
+                @Override
+                public BeanDynamicObject withNotImplementsMissing() {
+                    return this;
+                }
+            };
+        }
+        return withNoImplementsMissing;
     }
 
     @Override
@@ -310,12 +329,16 @@ public class BeanDynamicObject extends AbstractDynamicObject {
             return null;
         }
 
+        private Object[] metaPropArgumentsArray = new Object[2];
+
         @Nullable
         protected MetaProperty lookupProperty(MetaClass metaClass, String name) {
             if (metaClass instanceof MetaClassImpl) {
                 // MetaClass.getMetaProperty(name) is very expensive when the property is not known. Instead, reach into the meta class to call a much more efficient lookup method
                 try {
-                    return (MetaProperty) META_PROP_METHOD.invoke(metaClass, name, false);
+                    metaPropArgumentsArray[0] = name;
+                    metaPropArgumentsArray[1] = false;
+                    return (MetaProperty) META_PROP_METHOD.invoke(metaClass, metaPropArgumentsArray);
                 } catch (Throwable e) {
                     throw UncheckedException.throwAsUncheckedException(e);
                 }
